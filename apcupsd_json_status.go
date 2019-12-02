@@ -13,6 +13,7 @@ import (
 var (
 	daemonMode      = flag.Bool("d", false, "Use daemon mode")
 	collectInterval = flag.Int("i", 20, "Collect interval in seconds")
+	apcupdsHostPort = flag.String("c", "localhost:3551", "Connection string for apcupsd NIS server")
 )
 
 func init() {
@@ -21,6 +22,7 @@ func init() {
 
 // UPSCollector has the values
 type UPSCollector struct {
+	Timestamp              time.Time `json:"timestamp"`
 	UPSName                string    `json:"USBName"`
 	UPSMode                string    `json:"UPSMode"`
 	UPSModel               string    `json:"UPSModel"`
@@ -37,11 +39,24 @@ type UPSCollector struct {
 	LastTransferOffBattery time.Time `json:"LastTransferOffBattery"`
 	LastSelftest           time.Time `json:"LastSelftest"`
 	NominalPowerWatts      float64   `json:"NominalPowerWatts"`
+	Error                  bool      `json:"error"`
 }
 
-func collect(client *apcupsd.Client) *UPSCollector {
-	s, _ := client.Status()
+func collect() *UPSCollector {
+	client, err := apcupsd.Dial("tcp4", *apcupdsHostPort)
+	if err != nil {
+		log.Print("Errored: ", err)
+		return &UPSCollector{Timestamp: time.Now(), Error: true}
+	}
+
+	s, err := client.Status()
+	if err != nil {
+		log.Print("Client collection error:", err)
+		return &UPSCollector{Timestamp: time.Now(), Error: true}
+	}
+
 	res := &UPSCollector{
+		Timestamp:              time.Now(),
 		UPSName:                s.UPSName,
 		UPSMode:                s.UPSMode,
 		UPSModel:               s.Model,
@@ -58,32 +73,27 @@ func collect(client *apcupsd.Client) *UPSCollector {
 		LastTransferOffBattery: s.XOffBattery,
 		LastSelftest:           s.LastSelftest,
 		NominalPowerWatts:      float64(s.NominalPower),
+		Error:                  false,
 	}
 	return res
 }
 
 // Output json from the data collected from the client
-func output(client *apcupsd.Client, enc json.Encoder) {
-	res := collect(client)
+func output(enc json.Encoder) {
+	res := collect()
 	enc.Encode(res)
 }
 
 func main() {
 	enc := json.NewEncoder(os.Stdout)
 
-	client, err := apcupsd.Dial("tcp4", "localhost:3551")
-	if err != nil {
-		log.Fatal("Errored: ", err)
-	}
-
 	if *daemonMode {
 		for {
-			output(client, *enc)
+			output(*enc)
 			time.Sleep(time.Duration(*collectInterval) * time.Second)
 		}
-
 	} else {
-		output(client, *enc)
+		output(*enc)
 	}
 
 }
