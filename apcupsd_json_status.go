@@ -39,6 +39,7 @@ type UPSCollector struct {
 	LastTransferOffBattery time.Time `json:"LastTransferOffBattery"`
 	LastSelftest           time.Time `json:"LastSelftest"`
 	NominalPowerWatts      float64   `json:"NominalPowerWatts"`
+	Status                 string    `json:"status"`
 	Error                  bool      `json:"error"`
 }
 
@@ -73,8 +74,15 @@ func collect() *UPSCollector {
 		LastTransferOffBattery: s.XOffBattery,
 		LastSelftest:           s.LastSelftest,
 		NominalPowerWatts:      float64(s.NominalPower),
+		Status:                 s.Status,
 		Error:                  false,
 	}
+
+	// Jearh, we can still talk to apcupsd, but things are not OK.
+	if res.Status == "COMMLOST" {
+		res.Error = true
+	}
+
 	return res
 }
 
