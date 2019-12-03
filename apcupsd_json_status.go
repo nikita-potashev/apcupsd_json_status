@@ -22,7 +22,7 @@ func init() {
 
 // UPSCollector has the values
 type UPSCollector struct {
-	Timestamp              time.Time `json:"timestamp"`
+	Timestamp              string    `json:"@timestamp"`
 	UPSName                string    `json:"USBName"`
 	UPSMode                string    `json:"UPSMode"`
 	UPSModel               string    `json:"UPSModel"`
@@ -47,17 +47,17 @@ func collect() *UPSCollector {
 	client, err := apcupsd.Dial("tcp4", *apcupdsHostPort)
 	if err != nil {
 		log.Print("Errored: ", err)
-		return &UPSCollector{Timestamp: time.Now(), Error: true}
+		return &UPSCollector{Timestamp: time.Now().Format(time.RFC3339), Error: true}
 	}
 
 	s, err := client.Status()
 	if err != nil {
 		log.Print("Client collection error:", err)
-		return &UPSCollector{Timestamp: time.Now(), Error: true}
+		return &UPSCollector{Timestamp: time.Now().Format(time.RFC3339), Error: true}
 	}
 
 	res := &UPSCollector{
-		Timestamp:              time.Now(),
+		Timestamp:              time.Now().Format(time.RFC3339),
 		UPSName:                s.UPSName,
 		UPSMode:                s.UPSMode,
 		UPSModel:               s.Model,
